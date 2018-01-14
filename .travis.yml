@@ -12,4 +12,4 @@ branches:
   # tell travis to ignore version pushes
     - /^v\/[0-9A-Za-z\-\.]*/
 
-script: ./gradlew clean build
+script: ./gradlew clean build -PdockerBin=$(which docker)
