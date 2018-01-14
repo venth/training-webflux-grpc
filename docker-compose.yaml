@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+  service:
+    image: service:latest
+    build:
+      context: ./
