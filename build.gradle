@@ -1,0 +1,281 @@
+ext {
+    ver = [
+            failSafe                : '[1.0.4, 1.1.0)',
+            grpcSpringBootStarter   : '[2.1.4, 2.2.0)',
+
+            rxJava                  : "[2.1.4, 2.2.0)",
+
+            latrine                 : '[0.1.4, 0.2.0)',
+
+            grpc              : '[1.8.0, 1.9.0)',
+            rxgrpc            : '[0.7.2, 0.8.0)',
+            protobuf          : '[3.5.0, 3.6.0)',
+            grpcStarter       : '[2.1.0, 2.2.0)',
+            googleCommonProtos: '[0.1.20, 0.2.0)',
+            tcpNative         : '[2.0.7.Final, 2.1.0)',
+
+            reflections       : '[0.9.11, 1.0.0)',
+
+            groovy            : '2.4.13',
+            spock             : '[1.1-groovy-2.4,1.2)',
+            cglib             : '[3.2.5, 3.3.0)',
+            objenesis         : '2.6',
+            jaxbApi           : '[2.3.0, 2.4.0)',
+    ]
+}
+
+
+buildscript {
+    ext {
+        ver = [
+                springBoot                  : '[2.0.0.M7, 2.1)',
+                axionRelease                : '[1.8.1, 1.9.0)',
+                protobufPlugin              : '[0.8.1, 0.9.0)',
+                osdetectorPlugin            : '[1.4.0, 15.0)',
+        ]
+    }
+    repositories {
+        mavenLocal()
+        jcenter()
+        mavenCentral()
+        maven { url "https://repo.spring.io/snapshot" }
+        maven { url "https://repo.spring.io/milestone" }
+    }
+    dependencies {
+        classpath(
+                "org.springframework.boot:spring-boot-gradle-plugin:${ver.springBoot}",
+                "pl.allegro.tech.build:axion-release-plugin:${ver.axionRelease}",
+                "com.google.protobuf:protobuf-gradle-plugin:${ver.protobufPlugin}",
+                "com.google.gradle:osdetector-gradle-plugin:${ver.osdetectorPlugin}",
+        )
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'groovy'
+apply plugin: 'maven'
+apply plugin: 'idea'
+apply plugin: 'pl.allegro.tech.build.axion-release'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'com.google.protobuf'
+apply plugin: "com.google.osdetector"
+
+group = 'com.github.venth.training'
+
+scmVersion {
+    ignoreUncommittedChanges = false
+    tag {
+        prefix = 'v'
+        versionSeparator = ''
+    }
+}
+
+sourceCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_9
+
+repositories {
+    mavenLocal()
+    jcenter()
+    mavenCentral()
+    maven { url "https://repo.spring.io/snapshot" }
+    maven { url "https://repo.spring.io/milestone" }
+}
+
+configurations {
+    container
+}
+
+def containerClassifier = 'linux-x86_64'
+def tcpNativeClassifier = osdetector.classifier
+// Fedora variants use a different soname for OpenSSL than other linux distributions
+// (see http://netty.io/wiki/forked-tomcat-native.html).
+if (osdetector.os == "linux" && osdetector.release.isLike("fedora")) {
+    tcpNativeClassifier += "-fedora"
+}
+
+dependencies {
+    compile(
+            'org.springframework.boot:spring-boot-starter-webflux',
+            'org.springframework.boot:spring-boot-starter-actuator',
+            // grpc base configuration
+            "org.lognet:grpc-spring-boot-starter:${ver.grpcStarter}",
+
+            // grpc
+            "com.google.api.grpc:proto-google-common-protos:${ver.googleCommonProtos}",
+            "io.grpc:grpc-netty:${ver.grpc}",
+            "io.grpc:grpc-protobuf:${ver.grpc}",
+            "io.grpc:grpc-stub:${ver.grpc}",
+            "com.salesforce.servicelibs:rxgrpc-stub:${ver.rxgrpc}",
+            "io.netty:netty-tcnative-boringssl-static:${ver.tcpNative}:${tcpNativeClassifier}",
+
+            "org.reflections:reflections:${ver.reflections}",
+
+            // circuit breaker and repeater on failures
+            "net.jodah:failsafe:${ver.failSafe}",
+
+            // logging
+            "org.slf4j:slf4j-api",
+            "org.slf4j:log4j-over-slf4j",
+            "org.slf4j:jul-to-slf4j",
+            "org.slf4j:jcl-over-slf4j",
+
+            // reactive
+            "io.reactivex.rxjava2:rxjava:${ver.rxJava}",
+    )
+
+    compileOnly(
+            // to deal with spring configuration properties
+            // https://docs.spring.io/spring-boot/docs/2.0.0.M7/reference/html/configuration-metadata.html#configuration-metadata-annotation-processor
+            'org.springframework.boot:spring-boot-configuration-processor',
+
+            // to avoid writing boring stuff...
+            'org.projectlombok:lombok:1.16.20',
+    )
+
+    // ensure that boringssl valid for docker container os
+    container "io.netty:netty-tcnative-boringssl-static:${ver.tcpNative}:${containerClassifier}"
+
+    testCompile(
+            'org.springframework.boot:spring-boot-starter-test',
+            'io.projectreactor:reactor-test',
+
+            // mandatory dependencies for using Spock
+            "org.codehaus.groovy:groovy-all:${ver.groovy}",
+            "org.spockframework:spock-core:${ver.spock}",
+            "org.spockframework:spock-spring:${ver.spock}",
+
+            // optional dependencies for using Spock
+            // allows mocking of classes (in addition to interfaces)
+            "cglib:cglib-nodep:${ver.cglib}",
+            // allows mocking of classes without default constructor (together with CGLIB)
+            "org.objenesis:objenesis:${ver.objenesis}",
+
+            "io.grpc:grpc-testing:${ver.grpc}"
+    )
+}
+
+def BASE_IMAGE_NAME = 'service'
+
+task copyContainerSpecificLibs(type: Copy) {
+    into "${buildDir}/container-libs"
+    from configurations.container
+}
+
+def dockerBin = properties.get('dockerBin', '/usr/local/bin/docker')
+
+task buildDockerImage {
+    dependsOn copyContainerSpecificLibs
+
+    doLast {
+        String DOCKER_VERSIONED_IMAGE_NAME = "${BASE_IMAGE_NAME}:${scmVersion.uncachedVersion.decoratedVersion}"
+        exec {
+            workingDir './'
+            commandLine 'mkdir', '-p', "${buildDir}/container-libs"
+        }
+        exec {
+            workingDir './'
+            commandLine "${dockerBin}", 'build', '--tag', "${DOCKER_VERSIONED_IMAGE_NAME}", './'
+        }
+        exec {
+            workingDir './'
+            commandLine "${dockerBin}", 'tag', "${DOCKER_VERSIONED_IMAGE_NAME}", "${BASE_IMAGE_NAME}:latest"
+        }
+    }
+}
+
+project.version = scmVersion.uncachedVersion.decoratedVersion
+
+task fixReleaseVersion(type: Task) {
+    doLast {
+        version = scmVersion.uncachedVersion.decoratedVersion
+    }
+}
+
+createRelease.finalizedBy fixReleaseVersion
+build.dependsOn fixReleaseVersion
+build.finalizedBy buildDockerImage
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar
+}
+
+uploadArchives {
+    //XXX configure maven repo
+}
+
+compileJava {
+    options.fork = true
+    options.incremental = true
+    options.compilerArgs << '-parameters'
+
+    dependsOn processResources
+}
+
+wrapper {
+    gradleVersion = '4.4'
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${ver.protobuf}"
+    }
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${ver.grpc}"
+        }
+        rxgrpc {
+            artifact = "com.salesforce.servicelibs:rxgrpc:${ver.rxgrpc}:jdk8@jar"
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {
+                // To generate deprecated interfaces and static bindService method,
+                // turn the enable_deprecated option to true below:
+                option 'enable_deprecated=false'
+            }
+            rxgrpc {}
+        }
+    }
+}
+
+sourceSets {
+    main {
+        output.resourcesDir = java.outputDir
+    }
+    test {
+        output.resourcesDir = groovy.outputDir
+    }
+}
+
+idea {
+    module {
+        // love reading sources :)
+        downloadSources = true
+
+        sourceDirs += file("${buildDir}/generated/source/proto/main/java")
+        generatedSourceDirs += files("${buildDir}/generated/source/proto/main/java")
+
+        sourceDirs += file("${buildDir}/generated/source/proto/main/grpc")
+        generatedSourceDirs += files("${buildDir}/generated/source/proto/main/grpc")
+
+        sourceDirs += file("${buildDir}/generated/source/proto/main/rxgrpc")
+        generatedSourceDirs += files("${buildDir}/generated/source/proto/main/rxgrpc")
+
+        // convince intellij to used build as output directory for a module
+        outputDir compileJava.destinationDir
+        testOutputDir compileTestGroovy.destinationDir
+        inheritOutputDirs = false
+    }
+}

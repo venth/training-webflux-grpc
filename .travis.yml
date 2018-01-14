@@ -1,0 +1,15 @@
+sudo: required
+
+language: java
+jdk:
+  - oraclejdk8
+
+services:
+  - docker
+
+branches:
+  except:
+  # tell travis to ignore version pushes
+    - /^v\/[0-9A-Za-z\-\.]*/
+
+script: ./gradlew clean build

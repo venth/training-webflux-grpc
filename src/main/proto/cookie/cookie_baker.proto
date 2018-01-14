@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package cookie;
+
+option java_generic_services = true;
+option java_multiple_files = true;
+option java_package = "com.github.venth.training.webflux.grpc.api.cookie";
+option java_outer_classname = "CookiesProto";
+
+service CookieBaker {
+    rpc bake (BakeRequest) returns (stream Cookie);
+}
+
+message BakeRequest {
+    int64 numberOfCookies = 1;
+}
+
+message Cookie {
+    int64 id = 1;
+}

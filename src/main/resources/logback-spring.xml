@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false" scanPeriod="60 seconds" packageTrace="false" debug="false" >
+    <property resource="logback.properties" />
+    <contextName>@rootProject.name@_logback_context</contextName>
+    <jmxConfigurator/>
+
+    <appender name="async_console_appender" class="ch.qos.logback.classic.AsyncAppender">
+        <appender name="console_appender" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>${log_pattern}</pattern>
+            </encoder>
+        </appender>
+    </appender>
+
+    <!--LOGGERS-->
+    <root level="INFO">
+        <appender-ref ref="async_console_appender" />
+    </root>
+
+</configuration>
