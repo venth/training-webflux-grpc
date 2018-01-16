@@ -101,6 +101,7 @@ protobuf {
 }
 
 ```
+## Versioning
 - project versioning based on git tags via axion plugin
 ```
 buildscript {
@@ -135,6 +136,8 @@ apply plugin: 'pl.allegro.tech.build.axion-release'
 
 ```
 
+## Services
+### Serializarion / Deserialization Jackson with Protobuf
 Finally two endpoints along with tests:
 - CookieBakerController and
 - CookieBakerGrpcService
@@ -252,3 +255,55 @@ public class JacksonConfiguration {
 As the result I can now use protobuf to describe services in gRpc and transport object for Rest.
 
 Webflux works awesome and it seems that even usage of gRpc in webflux is easy as well.
+
+### gRpc adaptation with RxGRpc from salesforce
+
+To easier work with a service I prefer to have rx stream as an argument and as a result. Thanks to Salesforce I'm no loger forced
+to write an adapter for each service or client call. 
+
+- The magic is done with protobuf plugin - rxgrpc
+```
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${ver.protobuf}"
+    }
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${ver.grpc}"
+        }
+        rxgrpc {
+            artifact = "com.salesforce.servicelibs:rxgrpc:${ver.rxgrpc}:jdk8@jar"
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {
+                // To generate deprecated interfaces and static bindService method,
+                // turn the enable_deprecated option to true below:
+                option 'enable_deprecated=false'
+            }
+            rxgrpc {}
+        }
+    }
+}
+```
+
+- and pointing out source location for IntelliJ
+```
+idea {
+    module {
+        ...
+        
+        sourceDirs += file("${buildDir}/generated/source/proto/main/java")
+        generatedSourceDirs += files("${buildDir}/generated/source/proto/main/java")
+
+        sourceDirs += file("${buildDir}/generated/source/proto/main/grpc")
+        generatedSourceDirs += files("${buildDir}/generated/source/proto/main/grpc")
+
+        sourceDirs += file("${buildDir}/generated/source/proto/main/rxgrpc")
+        generatedSourceDirs += files("${buildDir}/generated/source/proto/main/rxgrpc")
+        
+        ...
+    }
+}
+```

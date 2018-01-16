@@ -263,12 +263,14 @@ idea {
         // love reading sources :)
         downloadSources = true
 
+        // protobuf files generated from proto files
         sourceDirs += file("${buildDir}/generated/source/proto/main/java")
         generatedSourceDirs += files("${buildDir}/generated/source/proto/main/java")
 
         sourceDirs += file("${buildDir}/generated/source/proto/main/grpc")
         generatedSourceDirs += files("${buildDir}/generated/source/proto/main/grpc")
 
+        // rxgrpc adaptation
         sourceDirs += file("${buildDir}/generated/source/proto/main/rxgrpc")
         generatedSourceDirs += files("${buildDir}/generated/source/proto/main/rxgrpc")
 
